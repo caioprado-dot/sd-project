@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  backend:
+    depends_on:
+      - db
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "9092:9092"
+    networks:
+      - app-network
+    volumes:
+      - ./backend:/app  # Monta o código-fonte local dentro do contêiner
+      - /app/target      # Evita que arquivos compilados sejam sobrescritos
+    environment:
+      - SPRING_PROFI
+      - LES_ACTIVE=dev
+      - JAVA_OPTS=-Dspring.devtools.restart.enabled=true -Dspring.devtools.livereload.enabled=true
+    command: mvn spring-boot:run
+    stdin_open: true  # Permite interação no terminal (útil para logs)
+    tty: true         # Mantém o contêiner rodando corretamente
+
+  db:
+    image: postgres:15
+    container_name: pg_spacewar
+    restart: always
+    environment:
+      POSTGRES_DB: spacewar
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5010:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    networks:
+      - app-network
+    volumes:
+      - ./frontend:/app  # Mapeia o código-fonte do frontend
+      - /app/node_modules  # Evita sobrescrever os pacotes do `node_modules`
+    environment:
+      - CHOKIDAR_USEPOLLING=true  # Garante que o live reload funcione no Docker
+    command: npm start
+    stdin_open: true
+    tty: true
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  pgdata:
+    driver: local
